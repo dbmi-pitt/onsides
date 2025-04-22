@@ -1,156 +1,187 @@
 # OnSIDES
 
-A resource of adverse drug effects extracted from FDA structured product labels.
+## Table of Contents
 
-## Release version 2.0.0
+- [Introduction](#introduction)
+- [Downloading the Data](#downloading-the-data)
+- [Loading into a database](#loading-the-data-into-the-database)
+- [Database design and organization](#database-design-and-organization)
+- [Data generation and metrics](#data-generation-and-metrics)
+- [Developer documentation](#developer-documentation)
+- [Limitations](#limitations)
+- [Contact](#contact)
 
-Second major release of the OnSIDES (ON label SIDE effectS resource) database of adverse reactions and boxed warnings extracted from the FDA structured product labels (SPLs). This version contains significant model improvements as well as updated labels. All labels available to download from DailyMed (https://dailymed.nlm.nih.gov/dailymed/spl-resources-all-drug-labels.cfm) were processed in this analysis. In total 2.8 million adverse reactions were extracted from over 45,000 labels for just under 2,000 drugs (single agents or combinations).
+---
 
-OnSIDES was created using the [PubMedBERT language model](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract) and 200 manually curated labels available from [Denmer-Fushman et al.](https://pubmed.ncbi.nlm.nih.gov/29381145/). The model achieves an F1 score of 0.90, AUROC of 0.92, and AUPR of 0.95 at extracting effects from the ADVERSE REACTIONS section of the label. This constitutes an absolute increase of 4% in each of the performance metrics over v1.0.0. For the BOXED WARNINGS section, the model achieves a F1 score of 0.71, AUROC of 0.85, and AUPR of 0.72. This constitutes an absolute increase of 10-17% in the performance metrics over v1.0.0. Compared against the TAC reference standard using the official evaluation script the model achieves a Micro-F1 score of 0.87 and a Macro-F1 of 0.85.
+## Introduction
 
-**Table 1. Performance metrics evaluated against the TAC gold standard**
+OnSIDES is an international, comprehensive database of drugs and their adverse events using data from drug product labels.
+Information was extracted by fine-tuning a [PubMedBERT language model](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract) on 200 manually curated labels available from [Denmer-Fushman et al.](https://pubmed.ncbi.nlm.nih.gov/29381145/).
+This comprehensive database will be updated quarterly, and currently contains more than 7.1 million drug-ADE pairs for 4,097 drug ingredients extracted from 51,460 labels, processed from all of the labels available to download from [DailyMed (USA)](https://dailymed.nlm.nih.gov/dailymed/spl-resources-all-drug-labels.cfm), [EMA (EU)](https://www.ema.europa.eu/en/medicines), [EMC (UK)](https://www.medicines.org.uk/emc), and [KEGG (Japan)](https://www.kegg.jp/kegg/drug/) as of April 2025.
 
-| Metric      | TAC (Best Model<sup>†</sup>) | SIDER 4.1 | OnSIDES v1.0.0 | OnSIDES v2.0.0 |
+### Citation
+
+If you use the OnSIDES database, results, or methods in your work, please reference [our paper](https://doi.org/10.1016/j.medj.2025.100642):
+
+>Tanaka Y, Chen HY, Belloni P, Gisladottir U, Kefeli J, Patterson J, Srinivasan A, Zietz M, Sirdeshmukh G, Berkowitz J, LaRow Brown K, Tatonetti NP. OnSIDES database: Extracting adverse drug events from drug labels using natural language processing models. Med. 2025 Mar 27:100642. doi: 10.1016/j.medj.2025.100642. PMID: 40179876.
+
+---
+
+## Downloading the data
+
+OnSIDES is released as a set of flat files (comma-separated), a SQLite database, and as an interactive dataset at [onsidesdb.org](https://onsidesdb.org).
+Downloads are available in the [Releases](https://github.com/tatonetti-lab/onsides/releases) section.
+
+---
+
+## Loading into a database
+
+We provide utilities to simplify loading OnSIDES into a relational database of your choice (e.g. MySQL, PostgreSQL, etc.).
+We have pre-built database schema files for [MySQL](database/schema/mysql.sql), [PostgreSQL](database/schema/postgres.sql), and [SQLite](database/schema/sqlite.sql), along with example bash scripts to create a database and load the files in the proper order ([MySQL](database/mysql.sh), [PostgreSQL](database/postgres.sh), and [SQLite](database/sqlite.sh)).
+These example scripts use [Podman](https://podman.io/) to run the databases in containers, but they can be easily adapted to work with existing databases.
+We also provide OnSIDES as a single, pre-built SQLite database, which you could import into a database with specialized tools like [pgloader](https://pgloader.readthedocs.io/en/latest/ref/sqlite.html) or [sqlite3-to-mysql](https://github.com/techouse/sqlite3-to-mysql).
+
+---
+
+## Database Design and Organization
+
+The OnSIDES database has the following seven tables:
+
+1. `product_label` - Individual drug products
+2. `product_adverse_effect` - Extracted adverse effects for drug products
+3. `product_to_rxnorm` - Mapping from drug products to RxNorm products (many-to-many)
+4. `vocab_rxnorm_product` - RxNorm products
+5. `vocab_rxnorm_ingredient_to_product` - Mapping from RxNorm products to RxNorm ingredients (many-to-many)
+6. `vocab_rxnorm_ingredient` - RxNorm ingredients
+7. `vocab_meddra_adverse_effect` - MedDRA adverse effect terms
+
+Tables starting with `product_` contain data from drug labels, while `vocab_` tables contain vocabulary mapping information from the [UMLS Metathesaurus](https://www.nlm.nih.gov/research/umls/knowledge_sources/metathesaurus/index.html) and the OMOP vocabularies (from [Athena](https://athena.ohdsi.org/)).
+
+Here's a diagram of the database schema:
+
+![Database ER diagram](docs/schema.png)
+
+
+---
+
+## Data Generation and Metrics
+
+OnSIDES is generated through the following steps:
+
+1. Find and download drug labels for all human prescription drugs from four sources (DailyMed, EMA, EMC, KEGG).
+2. Parse raw formats (e.g. PDF, XML), extract relevant sections, and format all label texts.
+3. Identify string matches of MedDRA terms in the extracted label texts (note, MedDRA Japan for Japanese labels).
+4. (Non-Japan): Apply PubMedBERT to score each matched term, and apply a cutoff threshold on the predictions.
+5. Map all drug products to RxNorm.
+6. Gather extracted data into a database (products, adverse effects identified). Combine with product-to-ingredient information from RxNorm and MedDRA concept mappings.
+7. Validate the database, and export tables as flat files.
+
+---
+
+## Model accuracy
+
+The fine-tuned PubMedBERT model used for OnSIDES achieved the following performance on 200 manually annotated FDA labels:
+
+| Section   |       F1 |   Precision |   Recall |    AUROC |     N |
+|:----------|---------:|------------:|---------:|---------:|------:|
+| Boxed Warning        | 0.964 |    0.971 | 0.957 | 0.977  |   686 |
+| Warnings and Precautions        | 0.882  |    0.883 | 0.881 | 0.933 | 10254 |
+| Adverse Reactions        | 0.935 |    0.946 | 0.924 | 0.956 | 12122 |
+
+
+In a separate comparison, this modeling approach was compared to the TAC 2017 dataset, and achieved the following performance:
+
+**Performance metrics evaluated against the TAC gold standard**
+
+| Metric      | TAC (Best Model<sup>†</sup>) | SIDER 4.1 | OnSIDES v1.0.0 | OnSIDES v2/3.0.0 |
 | ----------- | ---------------------------- | --------- | -------------- | -------------- |
 | F1 Score    | 82.19                        | 74.36     | 82.01          | **87.54**      |
 | Precision   | 80.69                        | 43.49     | 88.76          | **91.29**      |
 | Recall      | **85.05**                    | 52.89     | 77.12          | 84.08          |
 
-*<sup>†</sup> Roberts, Demner-Fushman, & Tonning, Overview of the TAC 2017*
 
-### Download
+---
 
-The latest database versions are available as a flat files in CSV format. Previous database versions can be
-accessed under [Releases](https://github.com/tatonetti-lab/onsides/releases). A [DDL](src/sql/mysql/create_tables.sql) (`create_tables.sql`) is provided to load the CSV files into a SQL schema.
+## Developer Documentation
 
-### June 2023 Data Release 
+This project uses [Snakemake](https://snakemake.readthedocs.io/en/stable/index.html) to reproducibly download and build the database.
+Snakemake is a workflow management tool that ensures work is not unnecessarily duplicated.
+Various steps are stored as `Snakefile`s, in the `snakemake` directory.
 
-[onsides_v2.0.0_20230629.tar.gz](https://github.com/tatonetti-lab/onsides/releases/download/v2.0.0-20230629/onsides_v2.0.0_20230629.tar.gz) 117MB (md5: 011056222b04f68fc4b31d7cdba1107d)
+By default, the first rule in a file is run.
+Each file's first rule is a catch-all rule called `all`.
+To run a Snakefile, ensure it's installed (e.g. `nix develop` or install manually), then run e.g. `snakemake -s snakemake/us/download/Snakefile`.
+Adding `-n` makes it a dry run, meaning it tells you what it *would* do, without actually doing it.
+Because Snakefiles can overwrite things, I recommend an initial dry run before running any other command, just to verify that you want it to do is what it will do.
 
-*Previous data releases can be found under the releases link to the right. Updated versions of the database will be completed quarterly.*
+The `snakemake` directory is organized as follows, with each sub-directory having a `Snakefile` and any additional scripts that are needed.
+You should run these `Snakefile`s from the project root directory.
 
-### Description of Tables
+```
+snakemake
+├── eu
+│   ├── download
+│   └── parse
+├── jp
+│   ├── download
+│   └── parse
+├── onsides
+│   ├── evaluate
+│   └── export
+├── uk
+│   ├── download
+│   └── parse
+└── us
+    ├── download
+    └── parse
+```
 
-Below is a brief description of the tables. See [`SCHEMA.md`](SCHEMA.md) for column descriptions and [`src/build_onsides.py`](src/build_onsides.py) for more details.
+To run everything, you'll want to download each source, then parse, then evaluate (`onsides/evaluate`), then export (`onsides/export`).
 
-`adverse_reactions` - Main table of adverse reactions. This table includes adverse reactions extracted from the ADVERSE REACTIONS section of the current active labels for each product and then grouped by ingredient(s). 125,054 rows.
-
-`adverse_reactions_all_labels` - All extracted adverse reactions from the ADVERSE REACTIONS section of every available version of the label. As the database is updated in the future, ingredient will have multiple labels over its lifetime (revisions, generic alternatives, etc.). This table contains the results of extracting adverse reactions from every label available for download from DailyMed. 2,871,306 rows.
-
-`adverse_reactions_active_labels` - All extracted adverse reactions from the ADVERSE REACTIONS section of active versions of the label. 2,782,288 rows.
-
-`boxed_warnings` - Main table of boxed warnings. This table includes adverse reactions extracted from the BOXED WARNINGS section of the current active label for each drug product and then grouped by ingredient(s). 2,681 rows.
-
-`boxed_warnings_all_labels` - All extracted adverse reactions from the BOXED WARNINGS section of all labels (including revisions, generics, etc). 40,587 rows.
-
-`boxed_warnings_active_labels` - All extracted adverse reactions from the BOXED WARNINGS section of all labels (including revisions, generics, etc). 39,334 rows.
-
-`ingredients` - Active ingredients for each of the parsed labels. If the label is for a drug with a single active compound then there will be only a single row for that label.  If the label is for a combination of compounds then there will be multiple rows for that label. 176,431 rows.
-
-`dm_spl_zip_files_meta_data` - Meta data provided by DailyMed that indicates which SPL version is the current for each drug product (`set_id`). 144,110 rows.
-
-`rxnorm_mappings` - Mapping drug product `set_id`s to their RxNorm CUIs. 448,754 rows.
-
-`rxcui_setid_map` - Map from SetID to RxNorm product ids. 143,634 rows.
-
-`rxnorm_product_to_ingredient` - Map from RxNorm product ids to RxNorm ingredient ids. 245,160 rows.
-
-## Replication, Retraining, and Improving the Model
-
-In this section we explain the steps and tools used to choose hyperparameters, train the model, and generate the database. If you'd like to skip the details you can check out the [Quick Start](#quick-start) subsection below which explains the minimal steps necessary to recreate OnSIDES from scratch.
-
-*Prerequisites*
-
-In addition to the cloned repository, a `data` subdirectory is required that contains three pieces of data.
-
-1. A file that maps MedDRA preferred terms to lower level terms.
-2. The manual annotations from Denmer-Fushman, et al paper and TAC.
-3. The TAC SPL labels in XML format with the Adverse Reactions, Boxed Warnings, and Warnings and Precautions sections parsed.
-
-For your convenience, there is an example data directory download available with the minimum requirements available for [download](https://github.com/tatonetti-lab/onsides/releases/download/v2.0.0/data.zip).
-
-Model training and evaluation is handled through the use of a helper script named `experiment_tracker.py`. There are several steps in the model training and evaluation pipeline and each has their own set of parameter options. The Experiment Tracker makes it straightforward to manage this process.
-
-### Quick Start
+Here is a minimal set of commands to generate everything:
 
 ```bash
-# Setup
-wget https://github.com/tatonetti-lab/onsides/archive/refs/tags/v2.0.0.tar.gz
-tar -xvzf v2.0.0.tar.gz
-cd onsides-2.0.0
-wget https://github.com/tatonetti-lab/onsides/releases/download/v2.0.0/data.zip
-unzip data
-python3 -m pip install -r requirements.txt
-
-# Train model for ADVERSE REACTIONS section
-python3 src/experiment_tracker.py --id v2.0.0-AR | bash
-
-# Train model for BOXED WARNINGS section
-# BW section uses a model pre-trained on ALL sections which is built in Experiment 4B
-python3 src/experiment_tracker.py --id 4B | bash
-# Fine-tune the pre-trained model for BOXED WARNINGS
-python3 src/experiment_tracker.py --id v2.0.0-BW | bash
-
-# Download all available prescription Structured Product Labels (SPLs)
-python3 src/spl_processor.py --full
-
-# Apply model to downloaded labels to identify ADRs from ADVERSE REACTIONS sections
-python3 src/deployment_tracker.py --release v2.0.0-AR | bash
-
-# Apply model to downloaded labels to identify ADRs from BOXED WARNINGS sections
-python3 src/deployment_tracker.py --release v2.0.0-BW | bash
-
-# Build database files
-python3 src/build_onsides.py --vocab ./data/omop/vocab_5.4 --release v2.0.0
+snakemake -s snakemake/us/download/Snakefile
+snakemake -s snakemake/uk/download/Snakefile
+snakemake -s snakemake/eu/download/Snakefile
+snakemake -s snakemake/jp/download/Snakefile
+snakemake -s snakemake/us/parse/Snakefile
+snakemake -s snakemake/uk/parse/Snakefile
+snakemake -s snakemake/eu/parse/Snakefile
+snakemake -s snakemake/jp/parse/Snakefile
+snakemake -s snakemake/onsides/evaluate/Snakefile
+snakemake -s snakemake/onsides/export/Snakefile
 ```
 
-### Replication of hyperparameter optimization experiments
+To be transparent, the reason I didn't package everything into a single command is because these scripts will inevitably become stale in various ways (source URLs change, etc.), and this makes debugging significantly easier for the inheritors of this project.
 
-Model Training consists of four steps: i) constructing the training data (`construct_training_data.py`), ii) fitting the BERT model (`fit_clinicalbert.py`), iii) generating probabilities for the example sentence fragments (`analyze_results.py`), and iv) aggregating the probabilities across sentence fragments at the adverse event term level (`compile_results.py`). The Experiment Tracker (`experiment_tracker.py`) will keep track of this entire process and what commands need to be run to complete the experiment. Experiments are managed by editing the experiments entries in the `experiments.json` file. In each experiments entry, the parameters that are to be explored can be specified. Any parameters not specified are assumed to be the default values.
 
-To track the status of the experiment run the script with the experiment identifier. For example:
-```
-python3 src/experiment_tracker.py --id 0
-```
+### Dependencies
 
-If any steps in the process of the experiment are incomplete, the script will print out a list of bash commands to the standard output that can be used to complete the experiment. For example you could run those commands with the following:
+To speed development and avoid dependency headaches, I built a development environment as a [nix flake](https://zero-to-nix.com/concepts/dev-env/).
+Nix is a declarative, reproducible package and environment manager.
+What this means is that, after you [install nix](https://determinate.systems/nix-installer/), all you need to run is `nix develop` to enter the development shell, and every prerequisite needed for OnSIDES will be available.
+If you prefer not to use nix, you'll need to install all the dependencies yourself, including Python (I recommend [uv](https://docs.astral.sh/uv/)), [Java](https://java.com), [tabula](https://tabula.technology/), [pandoc](https://pandoc.org/), and [DuckDB](https://duckdb.org/), then create the virtual environment for Python (e.g. `uv sync`).
 
-```
-python3 src/experiment_tracker.py --id 0 | bash
-```
+Simple answer?
+[Install nix](https://determinate.systems/nix-installer/), then run `nix develop`.
 
-If running on a GPU enabled machine, it may be beneficial to specify which GPU to use. The experiment tracker can automatically take care of this for you through the use of the CUDA_VISIBLE_DEVICES environment variable. This is set with the `--gpu` flag. For example:
+---
 
-```
-python3 src/experiment_tracker.py --id 0 --gpu 1
-```
+## Limitations
 
-You can monitor the status of all experiments that using the `--all` flag.
+OnSIDES is **strictly** intended for academic research purposes.
+The adverse drug event term extraction method is far from perfect - some side effects will be missed and some predicted as true adverse events will be incorrect.
 
-```
-python3 src/experiment_tracker.py --all
-```
+**Patients/healthcare professionals seeking health information should not trust or use this data, and instead refer to the information available from their regions' respective drug regulatory agencies, such as the [FDA](https://www.fda.gov/) (USA), [EMA](https://www.ema.europa.eu/en) (EU), [MHRA](https://www.gov.uk/government/organisations/medicines-and-healthcare-products-regulatory-agency) (UK), [PMDA](https://www.pmda.go.jp/english/) (Japan) and consult their healthcare providers for information.**
 
-### Training the Deployment Models for release
+Additionally, this project is under active development.
+We are continuing to further conduct independent validation of the performance of the models used, and improve the extraction methodology.
+As such, the data, methods, and statistics are subject to change at any time.
+Any updates to the database will be reflected on this page/in this repository.
 
-The `experiments.json` file can also be used to manage deployments. A deployment entry works the same as an experiment, except that only one set of parameters is used. We used the results of Experiments 1 through 10 to decide the deployment parameters. Each Experiment has a corresponding notebook in `notebooks` with an experiment description and an interpretation of the results.
+---
 
-### Evaluation
+## Contact
 
-Each experiment has a corresponding Jupyter notebook for evaluation (See `notebooks` subdirectory). The files and parameters necessary to run the notebook are saved in the `analysis.json` file. The `analysis.json` file is automatically generated by the experiment tracker once an experiment is complete and should not be edited directly. Each of these notebooks is essentially identical with the only difference being which experiment is being evaluated. Therefore, to add a notebook for a new experiment copy an existing notebook, rename it, and edit the experiment ID in the third code block. The notebook will print ROC and PR curves as well as a table of summary performance statistics.
-
-## Generating the OnSIDES Database
-
-Once the model has been trained, generating the database is done in five steps: i) download and pre-process the structured product labels (`spl_processor.py`), ii) identify adverse reaction terms and construct feature sentence fragments (`construct_application_data.py`), iii) apply the model to score feature sentence fragments (`predict.py`), iv) compile the results into csv datafiles for each label section (`create_onsides_datafiles.py`), and v) integrate the results with standard vocabularies and build the csv files (`build_onsides.py`). All five steps are automated and managed through the Deployment Tracker (`deployment_tracker.py`).
-
-See [DATABASE.md](DATABASE.md) for a step-by-step walkthrough.
-
-## Caveats
-
-The Onsides database is intended for research purposes only. The extraction process is far from perfect, side effects will be missed and some identified will be incorrect. Patients seeking health information should not trust these data and instead refer to the FDA's website (fda.gov) and consult their doctor.
-
-The project is under active development. Validation of extracted information is yet to be independently verified and the data, methods, and statistics are subject to change at any time. Check back to this page for updates. If you would like to to contribute to the project or have ideas on how the methods, data, or evaluation can be improved please reach out to Dr. Tatonetti via [email](https://tatonettilab.org/people/) or [Twitter](http://twitter.com/nicktatonetti).
-
-## Citation
-
-A manuscript describing the data, methods, and results is in preparation. In the mean time, please reference the github repository. [![DOI](https://zenodo.org/badge/479583027.svg)](https://zenodo.org/badge/latestdoi/479583027)
+If you would like to contribute to this project or have any suggestions on how the methods, data, or evaluation can be improved please reach out to Dr. Tatonetti via [email](https://tatonettilab.org/people/) or [Twitter](http://twitter.com/nicktatonetti).
