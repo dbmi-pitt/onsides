@@ -1,0 +1,21 @@
+]633;E;2025-08-04 15:33:13 for f in product_adverse_effect.csv product_to_rxnorm.csv vocab_rxnorm_product.csv vocab_rxnorm_ingredient_to_product.csv vocab_rxnorm_ingredient.csv vocab_meddra_adverse_effect.csv high_confidence.csv\x3b do   echo "$f:"\x3b head -n 1 "$f"\x3b echo ""\x3b  done > ~/onsides_csv_headers_report.txt;ad877737-fb53-4df7-aa41-5fc5844edc79]633;Cproduct_adverse_effect.csv:
+product_label_id,effect_id,label_section,effect_meddra_id,match_method,pred0,pred1
+
+product_to_rxnorm.csv:
+label_id,rxnorm_product_id
+
+vocab_rxnorm_product.csv:
+rxnorm_id,rxnorm_name,rxnorm_term_type
+
+vocab_rxnorm_ingredient_to_product.csv:
+product_id,ingredient_id
+
+vocab_rxnorm_ingredient.csv:
+rxnorm_id,rxnorm_name,rxnorm_term_type
+
+vocab_meddra_adverse_effect.csv:
+meddra_id,meddra_name,meddra_term_type
+
+high_confidence.csv:
+ingredient_id,effect_meddra_id
+
