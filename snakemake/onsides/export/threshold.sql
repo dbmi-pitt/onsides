@@ -5,7 +5,7 @@ BEGIN TRANSACTION;
 DELETE FROM
     product_adverse_effect
 WHERE
-    pred1 <= 3.258;
+    pred1 <= 3.258;f
 
 -- 2. Delete product_label rows that are no longer referenced in product_adverse_effect.
 DELETE FROM

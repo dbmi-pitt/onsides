@@ -1,3 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+_onsides
+.snakemake
+_onsides_old
+data
+openai_api_key.json
+duck.db
+duck.db.wal
+umls-2024AB-mrconso.zip
+train/models
+train/results
+database/csv
+log
+database/onsides.db
+db.zip
+summary.md
 # Data, models, and results directories
 data/
 trained_models/
