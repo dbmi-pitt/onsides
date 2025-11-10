@@ -4,7 +4,7 @@ CREATE SCHEMA IF NOT EXISTS onsides;
 CREATE TABLE IF NOT EXISTS onsides.z_qa_faers_wc_import_log (
     log_filename varchar(255) NOT NULL,
     filename varchar(255) NOT NULL,
-    laers_or_faers varchar(10) NOT NULL,
+  onsides_release_version varchar(32) NOT NULL,
     yr int4 NOT NULL,
     qtr int4 NOT NULL,
     wc_l_count int4 NOT NULL,

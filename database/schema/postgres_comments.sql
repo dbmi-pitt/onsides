@@ -55,7 +55,7 @@ COMMENT ON COLUMN vocab_rxnorm_ingredient_to_product.product_id IS 'FK to vocab_
 -- QA log
 COMMENT ON COLUMN z_qa_faers_wc_import_log.log_filename IS 'Basename of the source file.';
 COMMENT ON COLUMN z_qa_faers_wc_import_log.filename IS 'Full path to the source file at logging time.';
-COMMENT ON COLUMN z_qa_faers_wc_import_log.laers_or_faers IS 'Short dataset tag (e.g., FAERS/LAERS or a release tag like v3.1.0).';
+COMMENT ON COLUMN z_qa_faers_wc_import_log.onsides_release_version IS 'OnSIDES release tag or short dataset tag (e.g., v3.1.0, FAERS, LAERS).';
 COMMENT ON COLUMN z_qa_faers_wc_import_log.yr IS 'Dataset year (YY or YYYY).';
 COMMENT ON COLUMN z_qa_faers_wc_import_log.qtr IS 'Dataset quarter (1–4).';
 COMMENT ON COLUMN z_qa_faers_wc_import_log.wc_l_count IS 'Physical line count from wc -l (includes header; not CSV-aware).';

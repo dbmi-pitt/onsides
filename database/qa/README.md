@@ -3,19 +3,24 @@
 This workflow logs basic QA metrics comparing a source data file's line count to the row count in a target database table. Results are inserted into `onsides.z_qa_faers_wc_import_log`.
 
 ## What it records
-- `log_filename`: basename of the source file (placeholder; can be customized later)
-- `filename`: full path to the source file
-- `laers_or_faers`: a short tag (<=10 chars), e.g. `FAERS`, `LAERS`, or a release tag like `v3.1.0`
-- `yr`: year of the dataset
-- `qtr`: quarter of the dataset (1–4)
-- `wc_l_count`: result of `wc -l` on the source file
-- `csv_record_count`: CSV-aware logical record count (excludes the header; respects embedded newlines inside quoted fields)
-- `select_count_on_domain`: `SELECT COUNT(*)` on the specified domain table
-- `select_count_diff`: `select_count_on_domain - wc_l_count`
-- `select_count_diff_pct`: `select_count_diff / NULLIF(wc_l_count,0)` as a float
-- `csv_count_diff`: `select_count_on_domain - csv_record_count`
-- `csv_count_diff_pct`: `csv_count_diff / NULLIF(csv_record_count,0)` as a float
-- `execution_id`: optional execution identifier
+- `log_filename` (varchar(255), NOT NULL): basename of the source file (placeholder; can be customized)
+- `filename` (varchar(255), NOT NULL): full path to the source file at logging time
+- `onsides_release_version` (varchar(32), NOT NULL): OnSIDES release tag or short dataset tag, e.g. `v3.1.0`, `FAERS`, or `LAERS`
+- `yr` (int, NOT NULL): dataset year (YY or YYYY)
+- `qtr` (int, NOT NULL): dataset quarter (1–4)
+- `wc_l_count` (int, NOT NULL): raw `wc -l` physical line count of the source file (includes header)
+- `loaded_at` (timestamp, DEFAULT CURRENT_TIMESTAMP): when the log row was inserted
+- `select_count_on_domain` (int, NULL): `SELECT COUNT(*)` on the specified domain table at logging time
+- `select_count_diff` (int, NULL): `select_count_on_domain - wc_l_count`
+- `select_count_diff_pct` (float, NULL): `select_count_diff / NULLIF(wc_l_count,0)` as a float
+- `execution_id` (int, NULL): optional execution identifier for grouping runs
+- `csv_record_count` (int, NULL): CSV-aware logical record count (header skipped; embedded newlines handled)
+- `csv_count_diff` (int, NULL): `select_count_on_domain - csv_record_count`
+- `csv_count_diff_pct` (float, NULL): `csv_count_diff / NULLIF(csv_record_count,0)` as a float
+
+Notes about schema changes
+- The table DDL adds the CSV-aware columns (`csv_record_count`, `csv_count_diff`, `csv_count_diff_pct`) when the table already exists. These columns are present in the current DDL.
+- A previously-used `awk_nl_count` column (awk-based physical line count) was removed from the DDL; the workflow now uses `wc -l` for physical counts and a CSV-aware parser for logical counts.
 
 ## Usage
 
@@ -42,6 +47,20 @@ Notes:
 - Year supports YY or YYYY (e.g., 25 or 2025).
 - `select_count_on_domain` is computed from `SELECT COUNT(*) FROM <schema>.<table>`.
 
+Convenience scripts
+- `database/qa/ensure_qa_table_and_grants.sh` — idempotently creates/updates the QA log table (runs DDL and migration) and grants `rw_grp` the required privileges. Run as a superuser or pass PGUSER=postgres.
+- `database/qa/run_qa_bulk.sh` — run the QA logger across all CSVs in a directory (defaults to `data/csv/`). Uses `database/qa/qa_faers_wc_import_log.sh` for each file.
+
+Example one-line to prepare DB and run QA over CSVs:
+
+```
+# Ensure table and grants (run as postgres or a superuser)
+PGUSER=postgres PGDATABASE=cem_development_2025 PGPORT=5433 bash database/qa/ensure_qa_table_and_grants.sh
+
+# Run QA logger for all CSVs (as rw_grp)
+PGUSER=rw_grp PGDATABASE=cem_development_2025 PGPORT=5433 bash database/qa/run_qa_bulk.sh data/csv v3.1.0 2025 1 onsides
+```
+
 ## Troubleshooting
 - Permission denied: ensure your DB user can `SELECT` from the domain table and `INSERT` into `onsides.z_qa_faers_wc_import_log`.
 - Table not found: pass `--domain-schema` if your table is not in `onsides`.
@@ -59,4 +78,4 @@ In particular for `product_label.csv`:
 
 # 11/04/2025 load
 
-Today, we focused on logging QA metrics for the OnSIDES v3.1.0 release. This included running the QA logger for additional input files, ensuring that the line counts from the source files match the row counts in the database tables. Discrepancies were investigated, particularly in `product_label.csv`, where embedded newlines in quoted fields caused mismatches. Adjustments to the QA workflow were considered to account for logical row counts instead of physical line counts.
+Today, we focused on logging QA metrics for the OnSIDES v3.1.0 release. This included running the QA logger for additional input files and ensuring that the logical CSV record counts match the row counts in the database tables. Discrepancies were investigated (for example, `product_label.csv` had embedded newlines in quoted fields which made `wc -l` differ from logical CSV record counts). The README and DDL were updated to reflect the CSV-aware columns and the removal of the old `awk_nl_count` field.
