@@ -5,14 +5,26 @@ Click on the "Releases" tab on the right.
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Downloading the Data](#downloading-the-data)
-- [Loading into a database](#loading-the-data-into-the-database)
-- [Database design and organization](#database-design-and-organization)
-- [Data generation and metrics](#data-generation-and-metrics)
-- [Developer documentation](#developer-documentation)
-- [Limitations](#limitations)
-- [Contact](#contact)
+- [OnSIDES](#onsides)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+    - [Citation](#citation)
+  - [Downloading the data](#downloading-the-data)
+  - [Loading into a database](#loading-into-a-database)
+  - [Database Design and Organization](#database-design-and-organization)
+    - [Usage](#usage)
+    - [High confidence sets](#high-confidence-sets)
+    - [Manual annotations](#manual-annotations)
+  - [Data Generation and Metrics](#data-generation-and-metrics)
+  - [Model accuracy](#model-accuracy)
+  - [Developer Documentation](#developer-documentation)
+    - [Dependencies](#dependencies)
+    - [Building](#building)
+    - [Releasing](#releasing)
+  - [Limitations](#limitations)
+  - [Contact](#contact)
+- [Notes on recent ETL additions](#notes-on-recent-etl-additions)
+- [Q2 2025 load](#q2-2025-load)
 
 ---
 
@@ -303,5 +315,4 @@ If you would like to contribute to this project or have any suggestions on how t
 
 # Q2 2025 load
 
-This change was added in preparation for a Q2 2025 load and is currently untested. Please validate
-on your production/staging databases before trusting results.
+This change (derived_ingred_to_adr_cnt_postgres.sql) was applied manually for the Q2 2025 load and is currently untested as part of the ETL flow.
