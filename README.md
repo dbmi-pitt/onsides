@@ -283,3 +283,25 @@ Any updates to the database will be reflected on this page/in this repository.
 ## Contact
 
 If you would like to contribute to this project or have any suggestions on how the methods, data, or evaluation can be improved please reach out to Dr. Tatonetti via [email](https://tatonettilab.org/people/) or [Twitter](http://twitter.com/nicktatonetti).
+
+---
+
+# Notes on recent ETL additions
+
+- Added `snakemake/onsides/export/derived_ingred_to_adr_cnt_postgres.sql` (Postgres) and
+  `snakemake/onsides/export/derived_ingred_to_adr_cnt_sqlite.sql` (SQLite/DuckDB) to produce
+  `onsides.derived_ingred_to_adr_cnt` (ingredient -> MedDRA adverse event counts per label section).
+
+- These scripts have **not** been tested in this repository and were added for reproducibility and
+  convenience. The Postgres variant depends on external schemas (`reposdb`, `staging_vocabulary`) and
+  should be run against the production Postgres environment where those schemas exist.
+
+- The SQLite/DuckDB variant is included for local/archival workflows but does not fully reproduce the
+  "exclude indications" step that relies on `reposdb.reposdb_mapped` (no equivalent resides in the
+  SQLite DB). If you require the indication exclusion, run the Postgres script in an environment
+  that has the `reposdb` data available.
+
+# Q2 2025 load
+
+This change was added in preparation for a Q2 2025 load and is currently untested. Please validate
+on your production/staging databases before trusting results.
