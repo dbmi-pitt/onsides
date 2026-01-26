@@ -40,4 +40,9 @@ EOF
   echo "-------------------------------------" | tee -a "$LOG"
 done
 
+SYNC_SCRIPT="data_our_improvements/schema/post_load_sync.sql"
+echo "Running post-load sequence synchronization from $SYNC_SCRIPT..." | tee -a "$LOG"
+psql -d "$DB" -U "$USER" -v ON_ERROR_STOP=1 -f "$SYNC_SCRIPT" 2>>"$LOG"
+echo "✅ Sequence synchronization complete." | tee -a "$LOG"
+
 echo "Done at $(date)" | tee -a "$LOG"

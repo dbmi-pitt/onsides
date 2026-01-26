@@ -17,6 +17,7 @@ CREATE TABLE $SCHEMA.product_to_rxnorm (
     label_id INTEGER,
     rxnorm_product_id TEXT
 );
+ALTER TABLE $SCHEMA.product_to_rxnorm OWNER TO cem_dev_25_rw_grp;
 
 -- Recreate vocab_rxnorm_ingredient_to_product
 DROP TABLE IF EXISTS $SCHEMA.vocab_rxnorm_ingredient_to_product CASCADE;
@@ -24,6 +25,7 @@ CREATE TABLE $SCHEMA.vocab_rxnorm_ingredient_to_product (
     product_id TEXT,
     ingredient_id TEXT
 );
+ALTER TABLE $SCHEMA.vocab_rxnorm_ingredient_to_product OWNER TO cem_dev_25_rw_grp;
 
 -- Recreate vocab_rxnorm_ingredient
 DROP TABLE IF EXISTS $SCHEMA.vocab_rxnorm_ingredient CASCADE;
@@ -32,6 +34,7 @@ CREATE TABLE $SCHEMA.vocab_rxnorm_ingredient (
     rxnorm_name TEXT,
     rxnorm_term_type TEXT
 );
+ALTER TABLE $SCHEMA.vocab_rxnorm_ingredient OWNER TO cem_dev_25_rw_grp;
 
 EOF
 
